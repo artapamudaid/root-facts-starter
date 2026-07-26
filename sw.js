@@ -1,4 +1,4 @@
-const CACHE_NAME = 'root-facts-cache-v4';
+const CACHE_NAME = 'root-facts-cache-v5';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -13,7 +13,11 @@ const ASSETS_TO_CACHE = [
   './assets/js/services/facts.service.js',
   './model/model.json',
   './model/weights.bin',
-  './model/metadata.json'
+  './model/metadata.json',
+  './assets/icons/favicon.ico',
+  './assets/icons/apple-touch-icon.png',
+  './assets/icons/icon-192x192.png',
+  './assets/icons/icon-512x512.png'
 ];
 
 self.addEventListener('install', (event) => {
@@ -42,6 +46,9 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
+  // Hanya proses request http dan https
+  if (!event.request.url.startsWith('http')) return;
+
   event.respondWith(
     caches.match(event.request)
       .then((response) => {
@@ -56,14 +63,18 @@ self.addEventListener('fetch', (event) => {
         return fetch(fetchRequest).then(
           (response) => {
             // Check if we received a valid response
-            if (!response || response.status !== 200 || response.type !== 'basic') {
+            if (!response || (response.status !== 200 && response.type !== 'opaque')) {
               return response;
             }
 
             // Clone the response for caching
             const responseToCache = response.clone();
 
-            // Cache dynamic assets if needed, but for now we rely on static precache
+            // Cache dynamic assets for offline support (CDN, fonts, dll)
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(event.request, responseToCache);
+            });
+
             return response;
           }
         ).catch(() => {
