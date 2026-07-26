@@ -44,11 +44,12 @@ class DetectionService {
 		let tensor;
 		let predictions;
 		try {
-			// Normalisasi Teachable Machine: bagi 255 (range [0, 1])
+			// Normalisasi Teachable Machine: range [-1, 1]
 			tensor = tf.browser.fromPixels(imageElement)
 				.resizeBilinear([224, 224])
 				.toFloat()
-				.div(tf.scalar(255))
+				.div(tf.scalar(127.5))
+				.sub(tf.scalar(1))
 				.expandDims(0);
 
 			predictions = await this.model.predict(tensor).data();

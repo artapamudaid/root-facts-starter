@@ -60,13 +60,12 @@ class FunFactService {
 		this.isGenerating = true;
 		try {
 			const cleanVegetable = vegetable.replace(/[^a-zA-Z0-9\s-]/g, '').substring(0, 50);
-			const prompt = `Write a short fun fact about ${cleanVegetable} in a ${tone} tone.`;
+			const prompt = `Provide one short, accurate, and interesting fun fact specifically about the vegetable ${cleanVegetable} in a ${tone} tone. Only talk about ${cleanVegetable}.`;
 
 			const result = await this.generator(prompt, {
 				max_new_tokens: 80,
-				// Koreksi: Gunakan do_sample: true dan repetition_penalty agar deskripsi relevan dan tidak menghasilkan teks gibberish
-				temperature: 0.7,
-				top_p: 0.95,
+				temperature: 0.75,
+				top_p: 0.85,
 				do_sample: true,
 				repetition_penalty: 1.2
 			});
