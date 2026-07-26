@@ -73,7 +73,7 @@ class FunFactService {
 			return {
 				funFact: funFact,
 				tone: tone,
-				vegetable: cleanVegetable
+				vegetable: vegetable
 			};
 		} catch (error) {
 			logError('Error generating fun fact', error);
