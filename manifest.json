@@ -1,0 +1,12 @@
+{
+  "name": "RootFacts: Fakta Unik Sayuran AI",
+  "short_name": "RootFacts",
+  "description": "Kenali berbagai jenis sayuran melalui kamera dan temukan fakta menarik secara instan dengan bantuan kecerdasan buatan.",
+  "start_url": "/index.html",
+  "display": "standalone",
+  "background_color": "#f0fdf4",
+  "theme_color": "#16a34a",
+  "orientation": "portrait-primary",
+  "icons": [],
+  "screenshots": []
+}
