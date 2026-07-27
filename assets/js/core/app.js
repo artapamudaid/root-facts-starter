@@ -20,8 +20,8 @@ class RootFactsApp {
 		this.ui.disableButton();
 
 		this.bindEvents();
-		this.init();
 		this.registerServiceWorker();
+		this.init();
 	}
 
 	bindEvents() {
@@ -57,12 +57,10 @@ class RootFactsApp {
 
 	registerServiceWorker() {
 		if ('serviceWorker' in navigator) {
-			window.addEventListener('load', () => {
-				navigator.serviceWorker.register('./sw.js').then(registration => {
-					console.log('SW registered: ', registration);
-				}).catch(registrationError => {
-					console.log('SW registration failed: ', registrationError);
-				});
+			navigator.serviceWorker.register('./sw.js').then(registration => {
+				console.log('SW registered: ', registration);
+			}).catch(registrationError => {
+				console.log('SW registration failed: ', registrationError);
 			});
 		}
 	}
