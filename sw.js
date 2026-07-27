@@ -1,4 +1,4 @@
-const CACHE_NAME = 'root-facts-cache-v8';
+const CACHE_NAME = 'root-facts-cache-v9';
 const LOCAL_ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -30,6 +30,14 @@ const REMOTE_MODEL_ASSETS_TO_CACHE = [
   'https://huggingface.co/Xenova/LaMini-Flan-T5-77M/resolve/main/onnx/decoder_model_merged_quantized.onnx'
 ];
 
+const REMOTE_APP_ASSETS_TO_CACHE = [
+  'https://unpkg.com/lucide@0.562.0',
+  'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js',
+  'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgpu@4.22.0/dist/tf-backend-webgpu.min.js',
+  'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2',
+  'https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&display=swap'
+];
+
 const CACHE_FIRST_PATHS = [
   '/model/',
   '/assets/',
@@ -43,6 +51,7 @@ self.addEventListener('install', (event) => {
     caches.open(CACHE_NAME)
       .then((cache) => cacheAssets(cache, [
         ...LOCAL_ASSETS_TO_CACHE,
+        ...REMOTE_APP_ASSETS_TO_CACHE,
         ...REMOTE_MODEL_ASSETS_TO_CACHE
       ]))
       .then(() => self.skipWaiting())
@@ -78,7 +87,7 @@ const safeCachePut = async (cache, request, response) => {
   try {
     await cache.put(request, response.clone());
   } catch (error) {
-    console.warn('Gagal menyimpan cache:', request.url || request, error);
+    // Ignore uncacheable opaque/redirected responses so the SW stays quiet.
   }
 };
 
@@ -93,7 +102,7 @@ const cacheAssets = async (cache, assets) => {
           await safeCachePut(cache, request, response);
         }
       } catch (error) {
-        console.warn('Gagal precache asset:', asset, error);
+        // Ignore unavailable remote assets; runtime cache can fill them later.
       }
     })
   );
@@ -101,15 +110,21 @@ const cacheAssets = async (cache, assets) => {
 
 const isRemoteModelAsset = (url) => {
   return url.hostname === 'huggingface.co'
-    && url.pathname.includes('/Xenova/LaMini-Flan-T5-77M/')
-    && (
-      url.pathname.endsWith('/tokenizer.json')
-      || url.pathname.endsWith('/tokenizer_config.json')
-      || url.pathname.endsWith('/config.json')
-      || url.pathname.endsWith('/generation_config.json')
-      || url.pathname.endsWith('/onnx/encoder_model_quantized.onnx')
-      || url.pathname.endsWith('/onnx/decoder_model_merged_quantized.onnx')
-    );
+    && url.pathname.includes('/Xenova/LaMini-Flan-T5-77M/');
+};
+
+const createOfflineResponse = (request) => {
+  if (request.mode === 'navigate') {
+    return caches.match('./index.html');
+  }
+
+  return new Response('', {
+    status: 200,
+    statusText: 'OK',
+    headers: {
+      'Content-Type': 'text/plain'
+    }
+  });
 };
 
 const isStaticLocalAsset = (url) => {
@@ -134,10 +149,7 @@ const cacheFirst = async (request) => {
 
     return networkResponse;
   } catch (error) {
-    return new Response('', {
-      status: 504,
-      statusText: 'Offline asset is not cached'
-    });
+    return createOfflineResponse(request);
   }
 };
 
@@ -159,10 +171,7 @@ const staleWhileRevalidate = async (request) => {
   }
 
   const networkResponse = await networkResponsePromise;
-  return networkResponse || new Response('', {
-    status: 504,
-    statusText: 'Offline resource is not cached'
-  });
+  return networkResponse || createOfflineResponse(request);
 };
 
 self.addEventListener('fetch', (event) => {
@@ -184,7 +193,7 @@ self.addEventListener('fetch', (event) => {
         return await fetch(event.request);
       } catch (error) {
         const cachedResponse = await caches.match(event.request, { ignoreSearch: true });
-        return cachedResponse || caches.match('./index.html');
+        return cachedResponse || createOfflineResponse(event.request);
       }
     })()
   );
