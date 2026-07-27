@@ -1,4 +1,4 @@
-const CACHE_NAME = 'root-facts-cache-v9';
+const CACHE_NAME = 'root-facts-cache-v10';
 const LOCAL_ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -50,9 +50,7 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => cacheAssets(cache, [
-        ...LOCAL_ASSETS_TO_CACHE,
-        ...REMOTE_APP_ASSETS_TO_CACHE,
-        ...REMOTE_MODEL_ASSETS_TO_CACHE
+        ...LOCAL_ASSETS_TO_CACHE
       ]))
       .then(() => self.skipWaiting())
   );
@@ -119,8 +117,8 @@ const createOfflineResponse = (request) => {
   }
 
   return new Response('', {
-    status: 200,
-    statusText: 'OK',
+    status: 503,
+    statusText: 'Offline resource is not cached',
     headers: {
       'Content-Type': 'text/plain'
     }

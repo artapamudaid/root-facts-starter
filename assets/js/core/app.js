@@ -57,6 +57,26 @@ class RootFactsApp {
 
 	registerServiceWorker() {
 		if ('serviceWorker' in navigator) {
+			const serviceWorkerVersion = 'root-facts-sw-v10';
+			const currentVersion = localStorage.getItem('rootFactsServiceWorkerVersion');
+
+			if (navigator.onLine && currentVersion !== serviceWorkerVersion) {
+				localStorage.setItem('rootFactsServiceWorkerVersion', serviceWorkerVersion);
+				Promise.all([
+					navigator.serviceWorker.getRegistrations()
+						.then(registrations => Promise.all(registrations.map(registration => registration.unregister()))),
+					caches.keys()
+						.then(cacheNames => Promise.all(
+							cacheNames
+								.filter(cacheName => cacheName.startsWith('root-facts-cache-'))
+								.map(cacheName => caches.delete(cacheName))
+						))
+				]).then(() => {
+					window.location.reload();
+				});
+				return;
+			}
+
 			let refreshing = false;
 
 			navigator.serviceWorker.addEventListener('controllerchange', () => {
