@@ -1,4 +1,4 @@
-const CACHE_NAME = 'root-facts-cache-v6';
+const CACHE_NAME = 'root-facts-cache-v8';
 const LOCAL_ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -24,7 +24,10 @@ const LOCAL_ASSETS_TO_CACHE = [
 const REMOTE_MODEL_ASSETS_TO_CACHE = [
   'https://huggingface.co/Xenova/LaMini-Flan-T5-77M/resolve/main/tokenizer.json',
   'https://huggingface.co/Xenova/LaMini-Flan-T5-77M/resolve/main/tokenizer_config.json',
-  'https://huggingface.co/Xenova/LaMini-Flan-T5-77M/resolve/main/config.json'
+  'https://huggingface.co/Xenova/LaMini-Flan-T5-77M/resolve/main/config.json',
+  'https://huggingface.co/Xenova/LaMini-Flan-T5-77M/resolve/main/generation_config.json',
+  'https://huggingface.co/Xenova/LaMini-Flan-T5-77M/resolve/main/onnx/encoder_model_quantized.onnx',
+  'https://huggingface.co/Xenova/LaMini-Flan-T5-77M/resolve/main/onnx/decoder_model_merged_quantized.onnx'
 ];
 
 const CACHE_FIRST_PATHS = [
@@ -38,14 +41,10 @@ const CACHE_FIRST_PATHS = [
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then((cache) => {
-        return Promise.all([
-          cache.addAll(LOCAL_ASSETS_TO_CACHE),
-          Promise.allSettled(
-            REMOTE_MODEL_ASSETS_TO_CACHE.map((asset) => cache.add(asset))
-          )
-        ]);
-      })
+      .then((cache) => cacheAssets(cache, [
+        ...LOCAL_ASSETS_TO_CACHE,
+        ...REMOTE_MODEL_ASSETS_TO_CACHE
+      ]))
       .then(() => self.skipWaiting())
   );
 });
@@ -75,6 +74,31 @@ const isCacheableResponse = (response) => {
   return response && (response.status === 200 || response.type === 'opaque');
 };
 
+const safeCachePut = async (cache, request, response) => {
+  try {
+    await cache.put(request, response.clone());
+  } catch (error) {
+    console.warn('Gagal menyimpan cache:', request.url || request, error);
+  }
+};
+
+const cacheAssets = async (cache, assets) => {
+  await Promise.allSettled(
+    assets.map(async (asset) => {
+      try {
+        const request = new Request(asset, { cache: 'reload' });
+        const response = await fetch(request);
+
+        if (isCacheableResponse(response)) {
+          await safeCachePut(cache, request, response);
+        }
+      } catch (error) {
+        console.warn('Gagal precache asset:', asset, error);
+      }
+    })
+  );
+};
+
 const isRemoteModelAsset = (url) => {
   return url.hostname === 'huggingface.co'
     && url.pathname.includes('/Xenova/LaMini-Flan-T5-77M/')
@@ -82,6 +106,9 @@ const isRemoteModelAsset = (url) => {
       url.pathname.endsWith('/tokenizer.json')
       || url.pathname.endsWith('/tokenizer_config.json')
       || url.pathname.endsWith('/config.json')
+      || url.pathname.endsWith('/generation_config.json')
+      || url.pathname.endsWith('/onnx/encoder_model_quantized.onnx')
+      || url.pathname.endsWith('/onnx/decoder_model_merged_quantized.onnx')
     );
 };
 
@@ -94,16 +121,24 @@ const isStaticLocalAsset = (url) => {
 };
 
 const cacheFirst = async (request) => {
+  const cache = await caches.open(CACHE_NAME);
   const cachedResponse = await caches.match(request, { ignoreSearch: true });
   if (cachedResponse) return cachedResponse;
 
-  const networkResponse = await fetch(request);
-  if (isCacheableResponse(networkResponse)) {
-    const cache = await caches.open(CACHE_NAME);
-    await cache.put(request, networkResponse.clone());
-  }
+  try {
+    const networkResponse = await fetch(request);
 
-  return networkResponse;
+    if (isCacheableResponse(networkResponse)) {
+      await safeCachePut(cache, request, networkResponse);
+    }
+
+    return networkResponse;
+  } catch (error) {
+    return new Response('', {
+      status: 504,
+      statusText: 'Offline asset is not cached'
+    });
+  }
 };
 
 const staleWhileRevalidate = async (request) => {
@@ -113,17 +148,21 @@ const staleWhileRevalidate = async (request) => {
   const networkResponsePromise = fetch(request)
     .then((networkResponse) => {
       if (isCacheableResponse(networkResponse)) {
-        cache.put(request, networkResponse.clone());
+        safeCachePut(cache, request, networkResponse);
       }
       return networkResponse;
-    });
+    })
+    .catch(() => undefined);
 
   if (cachedResponse) {
-    networkResponsePromise.catch(() => undefined);
     return cachedResponse;
   }
 
-  return networkResponsePromise;
+  const networkResponse = await networkResponsePromise;
+  return networkResponse || new Response('', {
+    status: 504,
+    statusText: 'Offline resource is not cached'
+  });
 };
 
 self.addEventListener('fetch', (event) => {
